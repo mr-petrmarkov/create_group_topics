@@ -12,7 +12,7 @@ client.start()
 
 app = Flask(__name__)
 
-@app.route("/create_forum_group", methods=["POST"])
+@app.route("/create_group_topic", methods=["POST"])
 def create_forum_group():
     data = request.json
     title = data.get("title", "Новая форум-группа")
