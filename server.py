@@ -1,65 +1,55 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from telethon import TelegramClient
-from telethon.tl.functions.channels import CreateChannel, ToggleForum, InviteToChannel
-from telethon.tl.functions.messages import CreateForumTopic
+from telethon.tl.functions.messages import CreateChatRequest
 import asyncio
+import uvicorn
 
+# 🔑 Укажи свои api_id, api_hash и session
 api_id = 21334519
 api_hash = "ad90b94b00185c6d9b0341af99121cf2"
+session_name = "session_name"
 
-client = TelegramClient("my_session", api_id, api_hash)
-client.start()
+# создаём FastAPI
+app = FastAPI()
 
-app = Flask(__name__)
+# создаём Telethon client один раз при старте
+client = TelegramClient(session_name, api_id, api_hash)
 
-@app.route("/create_group_topic", methods=["POST"])
-def create_forum_group():
-    data = request.json
-    title = data.get("title", "Новая форум-группа")
-    users = data.get("users", [])        # список username или ID
-    topics = data.get("topics", [])      # список названий топиков
+@app.on_event("startup")
+async def startup_event():
+    # подключаем клиента при старте приложения
+    await client.start()
 
-    async def runner():
-        # 1. создаём мегагруппу
-        result = await client(CreateChannel(
-            title=title,
-            about="Группа с топиками",
-            megagroup=True
-        ))
-        chat = result.chats[0]
+@app.post("/create_group")
+async def create_group(request: Request):
+    try:
+        data = await request.json()
+        title = data.get("title")
+        users = data.get("users", [])
 
-        # 2. включаем форумный режим
-        await client(ToggleForum(channel=chat, enabled=True))
+        if not title or not users:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "title и users обязательны"}
+            )
 
-        # 3. приглашаем пользователей
-        if users:
-            try:
-                await client(InviteToChannel(
-                    channel=chat,
-                    users=users
-                ))
-            except Exception as e:
-                print(f"Ошибка добавления юзеров: {e}")
+        # создаём группу
+        result = await client(CreateChatRequest(users=users, title=title))
 
-        # 4. создаём топики
-        created_topics = []
-        for t in topics:
-            try:
-                topic = await client(CreateForumTopic(
-                    channel=chat,
-                    title=t
-                ))
-                created_topics.append(t)
-            except Exception as e:
-                print(f"Ошибка создания топика {t}: {e}")
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ok", "chat": str(result)}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
-        return {"chat_id": chat.id, "topics": created_topics}
-
-    result = client.loop.run_until_complete(runner())
-    return jsonify({"status": "ok", "result": result})
-
-
+# 🔥 локальный запуск (для отладки)
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+
 
 
