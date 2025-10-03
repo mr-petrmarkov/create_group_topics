@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from telethon import TelegramClient
 from telethon.tl.functions.messages import CreateChatRequest, MigrateChatRequest
-from telethon.tl.functions.channels import CreateForumTopic
+from telethon.tl.functions.channels import CreateForumTopicRequest
 
 # Fallback для включения форумов (ToggleForum не всегда доступен)
 try:
